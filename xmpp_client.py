@@ -6,6 +6,8 @@ from sleekxmpp.plugins.xep_0004.stanza.field import FormField, FieldOption
 
 from contact import Contact
 
+SERVER = '@alumchat.fun'
+PORT = 5222
 
 class Client(ClientXMPP):
     def __init__(self, jid, password):
@@ -32,13 +34,16 @@ class Client(ClientXMPP):
         self.send_message(mto=jid, mbody=message, mtype='chat')
 
     def login(self):
-        if self.connect(("alumchat.fun", 5222), use_ssl=False, use_tls=False):
+        if self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False):
             self.process()
             return True
         return False
 
     def set_status(self, show, status):
         self.send_presence(pshow=show, pstatus=status)
+
+    def add_contact(self, jid, subscription_meessage):
+        self.send_presence(pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
 
     def get_all_contacts(self):
         iq = self.create_iq(type="set", id="search_result",

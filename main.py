@@ -63,7 +63,10 @@ while option != "7":
     if option == "1":
         client.get_all_contacts()
     elif option == "2":
-        pass
+        user_to_add = input("Ingrese el nombre de usuario del usuario a agregar: ")
+        subscription_message = input("Ingrese el mensaje de solicitud de subscripcion: ")
+        client.add_contact(user_to_add, subscription_message)
+        print("\nSubscripcion enviada")
     elif option == "3":
         pass
     elif option == "4":
