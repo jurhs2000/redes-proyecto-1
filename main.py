@@ -61,7 +61,7 @@ while option != "7":
     print(menu)
     option = input("Seleccione una opcion: ")
     if option == "1":
-        pass
+        client.get_all_contacts()
     elif option == "2":
         pass
     elif option == "3":
@@ -74,6 +74,7 @@ while option != "7":
         pass
     elif option == "7":
         print("Saliendo...")
+        client.disconnect()
         exit()
     else:
         print("Opcion no valida")
