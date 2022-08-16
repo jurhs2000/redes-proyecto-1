@@ -83,9 +83,16 @@ while option != "9":
         user_to_search = input("Ingrese el nombre de usuario del usuario a buscar: ")
         client.search_user(user_to_search)
     elif option == "4":
-        user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el mensaje: ")
-        message = input("Ingrese el mensaje a enviar: ")
-        client.send_message_to_user(user_to_send, message)
+        print("\n1. enviar mensaje\n2. enviar archivo")
+        message_option = input("Seleccione una opcion: ")
+        if message_option == "1":
+            user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el mensaje: ")
+            message = input("Ingrese el mensaje a enviar: ")
+            client.send_message_to_user(user_to_send, message)
+        elif message_option == "2":
+            user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el archivo: ")
+            file_path = input("Ingrese el path del archivo a enviar: ")
+            client.send_file_to_user(user_to_send, file_path)
     elif option == "5":
         group_name = input("Ingrese el nombre del grupo: ")
         client.create_group(group_name)
@@ -99,7 +106,19 @@ while option != "9":
         message = input("Ingrese el mensaje a enviar: ")
         client.send_message_to_group(group_to_send, message)
     elif option == "8":
-        pass
+        print("\n1. available\n2. away\n3. not available\n4. busy")
+        value = input("Ingrese el valor de presencia: ")
+        message = input("Ingrese el mensaje de presencia: ")
+        show = ""
+        if value == "1":
+            show = "available"
+        elif value == "2":
+            show = "away"
+        elif value == "3":
+            show = "xa"
+        elif value == "4":
+            show = "dnd"
+        client.set_status(show, message)
     elif option == "9":
         print("Saliendo...")
         client.disconnect()

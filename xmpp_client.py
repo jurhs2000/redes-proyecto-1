@@ -1,3 +1,4 @@
+import base64
 from sleekxmpp import ClientXMPP
 from sleekxmpp.xmlstream.stanzabase import ET
 from sleekxmpp.exceptions import IqTimeout, IqError
@@ -22,14 +23,19 @@ class Client(ClientXMPP):
         self.add_event_handler('session_start', self.on_session_start)
         self.add_event_handler("register", self.on_register)
         self.add_event_handler("presence_subscribe", self.on_presence_subscribe)
+        self.add_event_handler("presence_unsubscribe", self.on_presence_unsubscribe)
         self.add_event_handler("message", self.on_message)
         self.add_event_handler("groupchat_invite", self.muc_invite)
         self.register_plugin('xep_0030') # Service Discovery
         self.register_plugin('xep_0004') # Data forms
+        self.register_plugin('xep_0065') # SOCKS5 Bytestreams
         self.register_plugin('xep_0066') # Out-of-band Data
+        self.register_plugin('xep_0071') # XHTML-IM
         self.register_plugin('xep_0077') # In-band Registration
         self['xep_0077'].force_registration = True
         self.register_plugin('xep_0045') # Multi-User Chat
+        self.register_plugin('xep_0096') # File transfer
+        self.register_plugin('xep_0231') # BOB
         self.contacts = []
 
     def on_session_start(self, event):
@@ -50,9 +56,49 @@ class Client(ClientXMPP):
     def send_message_to_user(self, jid, message):
         self.send_message(mto=jid+SERVER, mbody=message, mtype='chat')
 
+    async def send_file_to_user(self, jid, file):
+        '''m = self.Message()
+        m['to'] = jid+SERVER
+        m['type'] = 'chat'
+        with open(file, 'rb') as img_file:
+            img = img_file.read()
+        if img:
+            cid = self['xep_0231'].set_bob(img, 'image/png')
+            m['body'] = 'Tried sending an image using HTML-IM + BOB'
+            m['html']['body'] = '<img src="cid:%s" />' % cid
+            m.send()'''
+        '''with open(file, 'rb') as img:
+            file = base64.b64encode(img.read()).decode('utf-8')
+
+        self.send_message(mto=jid+SERVER, mbody=file, mtype='chat')'''
+        try:
+            self.file = open(file, 'rb')
+            # Open the S5B stream in which to write to.
+            proxy = await self['xep_0065'].handshake(jid+SERVER)
+
+            # Send the entire file.
+            while True:
+                data = self.file.read(1048576)
+                if not data:
+                    break
+                await proxy.write(data)
+
+            # And finally close the stream.
+            proxy.transport.write_eof()
+        except (IqError, IqTimeout):
+            print('File transfer errored')
+        else:
+            print('File transfer finished')
+        finally:
+            self.file.close()
+
     def on_presence_subscribe(self, presence):
         username = presence['from'].bare
         print(f'{username} quiere agregarte a tu lista de contactos')
+
+    def on_presence_unsubscribe(self, presence):
+        username = presence['from'].bare
+        print(f'{username} te ha eliminado de su lista de contactos')
 
     def login(self):
         if self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False):
