@@ -61,16 +61,19 @@ while option != "7":
     print(menu)
     option = input("Seleccione una opcion: ")
     if option == "1":
-        client.get_all_contacts()
+        client.get_contacts()
     elif option == "2":
         user_to_add = input("Ingrese el nombre de usuario del usuario a agregar: ")
         subscription_message = input("Ingrese el mensaje de solicitud de subscripcion: ")
         client.add_contact(user_to_add, subscription_message)
         print("\nSubscripcion enviada")
     elif option == "3":
-        pass
+        user_to_search = input("Ingrese el nombre de usuario del usuario a buscar: ")
+        client.search_user(user_to_search)
     elif option == "4":
-        client.send_message_to_user("hola@alumchat.fun", "que tal")
+        user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el mensaje: ")
+        message = input("Ingrese el mensaje a enviar: ")
+        client.send_message_to_user(user_to_send, message)
     elif option == "5":
         pass
     elif option == "6":
