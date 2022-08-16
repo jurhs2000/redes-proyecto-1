@@ -100,7 +100,7 @@ while option != "9":
     elif option == "6":
         group_name = input("Ingrese el nombre del grupo: ")
         client.join_group(group_name)
-        print("\nUsuario agregado")
+        print("\nHas entrado al grupo")
     elif option == "7":
         group_to_send = input("Ingrese el nombre del grupo a enviar el mensaje: ")
         message = input("Ingrese el mensaje a enviar: ")

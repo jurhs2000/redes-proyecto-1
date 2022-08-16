@@ -8,6 +8,7 @@ import logging
 from contact import Contact
 
 SERVER = '@alumchat.fun'
+ROOM_SERVER = '@conference.alumchat.fun'
 PORT = 5222
 
 #logging.basicConfig(level=logging.DEBUG,
@@ -24,7 +25,10 @@ class Client(ClientXMPP):
         self.add_event_handler("register", self.on_register)
         self.add_event_handler("presence_subscribe", self.on_presence_subscribe)
         self.add_event_handler("presence_unsubscribe", self.on_presence_unsubscribe)
+        self.add_event_handler("got_offline", self.on_got_offline)
+        self.add_event_handler("got_online", self.on_got_online)
         self.add_event_handler("message", self.on_message)
+        self.add_event_handler("changed_status", self.on_changed_status)
         self.add_event_handler("groupchat_invite", self.muc_invite)
         self.register_plugin('xep_0030') # Service Discovery
         self.register_plugin('xep_0004') # Data forms
@@ -43,7 +47,37 @@ class Client(ClientXMPP):
         self.update_roster()
 
     def on_message(self, msg):
-        print(msg)
+        # on type groupchat
+        if msg['type'] == 'groupchat':
+            room = msg['from'].bare.split('@')[0]
+            # get the message
+            message = msg['body']
+            # get the nick
+            nick = msg['mucnick']
+            print(f'\n[{room}] {nick}: {message}')
+        else:
+            # remove all after @
+            user = msg['from'].bare.split('@')[0]
+            print(f'\n{user}: {msg["body"]}')
+
+    def on_got_offline(self, presence):        
+        if self.boundjid.bare not in str(presence['from']):
+            u = self.jid_to_user(str(presence['from']))
+            print(f'{u} se desconectó')
+            for i in self.contacts:
+                if i.jid == str(presence['from']):
+                    self.contacts.remove(i)
+                    break
+
+    def on_got_online(self, presence):
+        if self.boundjid.bare not in str(presence['from']):
+            u = self.jid_to_user(str(presence['from']))
+            print(f'{u} se conectó')
+            for i in self.contacts:
+                if i.jid == str(presence['from']):
+                    i.online = True
+                    break
+
 
     def update_roster(self):
         roster = self.get_roster()
@@ -99,6 +133,11 @@ class Client(ClientXMPP):
     def on_presence_unsubscribe(self, presence):
         username = presence['from'].bare
         print(f'{username} te ha eliminado de su lista de contactos')
+
+    def on_changed_status(self, presence):
+        username = presence['from'].bare
+        print(self.client_roster.presence[username]['status'])
+        print(f'{username} ha cambiado su estado a {self.client_roster.presence[username]["status"]}')
 
     def login(self):
         if self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False):
@@ -223,21 +262,22 @@ class Client(ClientXMPP):
 
     def create_group(self, room):
         print(self.plugin['xep_0045'].getJoinedRooms())
-        self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait=True)
-        self.plugin['xep_0045'].setAffiliation(room, self.boundjid.full, affiliation='owner')
-        self.plugin['xep_0045'].configureRoom(room, ifrom=self.boundjid.full)
+        self.plugin['xep_0045'].joinMUC(room+ROOM_SERVER, self.boundjid.user, wait=True)
+        self.plugin['xep_0045'].setAffiliation(room+ROOM_SERVER, self.boundjid.full, affiliation='owner')
+        self.plugin['xep_0045'].configureRoom(room+ROOM_SERVER, ifrom=self.boundjid.full)
 
     def join_group(self, room):
         print(self.plugin['xep_0045'].getJoinedRooms())
-        self.plugin['xep_0045'].joinMUC(room, self.boundjid.user)
-        self.add_event_handler("muc::%s::got_online" % room,
+        self.plugin['xep_0045'].joinMUC(room+ROOM_SERVER, self.boundjid.user)
+        self.add_event_handler("muc::%s::got_online" % room+ROOM_SERVER,
                                self.muc_online)
 
     def send_message_to_group(self, room, message):
-        self.send_message(mto=room, mbody=message, mtype='groupchat')
+        self.send_message(mto=room+ROOM_SERVER, mbody=message, mtype='groupchat')
 
     def muc_online(self, presence):
-        print(presence['muc']['nick'], 'has joined the room')
+        if presence['muc']['nick'] != self.boundjid.user:
+            print(f'{presence["muc"]["nick"]} se ha conectado a la sala')
 
     def muc_invite(self, inv):
         print('invitacion a grupo')
