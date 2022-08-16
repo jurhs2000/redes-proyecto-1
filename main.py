@@ -41,7 +41,7 @@ while option != "3" and not is_authenticated:
         password = input("Ingrese su contraseña: ")
         name = input("Ingrese su nombre: ")
         email = input("Ingrese su correo: ")
-        client = Client(username + SERVER, password, name, email)
+        client = Client(username + SERVER, password, name, email, registering=True)
         if client.login():
             is_authenticated = True
             print("\nCuenta creada")
@@ -60,14 +60,16 @@ menu = '''
 2. Agregar usuario
 3. Mostrar detalles de usuario
 4. Enviar mensaje a un usuario
-5. Enviar mensaje a grupo
-6. Enviar mensaje de presencia
-7. Salir
+5. Crear grupo
+6. Unirse a grupo
+7. Enviar mensaje a grupo
+8. Enviar mensaje de presencia
+9. Salir
 '''
 
 option = ""
 
-while option != "7":
+while option != "9":
     print(menu)
     option = input("Seleccione una opcion: ")
     if option == "1":
@@ -85,10 +87,20 @@ while option != "7":
         message = input("Ingrese el mensaje a enviar: ")
         client.send_message_to_user(user_to_send, message)
     elif option == "5":
-        pass
+        group_name = input("Ingrese el nombre del grupo: ")
+        client.create_group(group_name)
+        print("\nGrupo creado")
     elif option == "6":
-        pass
+        group_name = input("Ingrese el nombre del grupo: ")
+        client.join_group(group_name)
+        print("\nUsuario agregado")
     elif option == "7":
+        group_to_send = input("Ingrese el nombre del grupo a enviar el mensaje: ")
+        message = input("Ingrese el mensaje a enviar: ")
+        client.send_message_to_group(group_to_send, message)
+    elif option == "8":
+        pass
+    elif option == "9":
         print("Saliendo...")
         client.disconnect()
         exit()

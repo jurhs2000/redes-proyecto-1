@@ -3,30 +3,41 @@ from sleekxmpp.xmlstream.stanzabase import ET
 from sleekxmpp.exceptions import IqTimeout, IqError
 from sleekxmpp.plugins.xep_0004.stanza.form import Form
 from sleekxmpp.plugins.xep_0004.stanza.field import FormField, FieldOption
-
+import logging
 from contact import Contact
 
 SERVER = '@alumchat.fun'
 PORT = 5222
 
+#logging.basicConfig(level=logging.DEBUG,
+#                        format='%(levelname)-8s %(message)s')
+
 class Client(ClientXMPP):
-    def __init__(self, jid, password, Name=None, Email=None):
+    def __init__(self, jid, password, Name=None, Email=None, registering=False):
         ClientXMPP.__init__(self, jid, password)
         self.password = password
         self.Name = Name
         self.Email = Email
+        self.registering = registering
         self.add_event_handler('session_start', self.on_session_start)
         self.add_event_handler("register", self.on_register)
-        self.register_plugin('xep_0030')  # Service Discovery
-        self.register_plugin('xep_0004')  # Data forms
-        self.register_plugin('xep_0066')  # Out-of-band Data
-        self.register_plugin('xep_0077')  # In-band Registration
+        self.add_event_handler("presence_subscribe", self.on_presence_subscribe)
+        self.add_event_handler("message", self.on_message)
+        self.add_event_handler("groupchat_invite", self.muc_invite)
+        self.register_plugin('xep_0030') # Service Discovery
+        self.register_plugin('xep_0004') # Data forms
+        self.register_plugin('xep_0066') # Out-of-band Data
+        self.register_plugin('xep_0077') # In-band Registration
         self['xep_0077'].force_registration = True
+        self.register_plugin('xep_0045') # Multi-User Chat
         self.contacts = []
 
     def on_session_start(self, event):
         self.set_status('chat', 'available')
         self.update_roster()
+
+    def on_message(self, msg):
+        print(msg)
 
     def update_roster(self):
         roster = self.get_roster()
@@ -38,6 +49,10 @@ class Client(ClientXMPP):
 
     def send_message_to_user(self, jid, message):
         self.send_message(mto=jid+SERVER, mbody=message, mtype='chat')
+
+    def on_presence_subscribe(self, presence):
+        username = presence['from'].bare
+        print(f'{username} quiere agregarte a tu lista de contactos')
 
     def login(self):
         if self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False):
@@ -146,15 +161,37 @@ class Client(ClientXMPP):
                     break
 
     def on_register(self, event):
-        iq = self.Iq()
-        iq['type'] = 'set'
-        iq['register']['username'] = self.boundjid.user
-        iq['register']['password'] = self.password
-        iq['register']['name'] = self.Name
-        iq['register']['email'] = self.Email
-        try:
-            iq.send(now=True)
-        except IqError as e:
-            print(e.iq)
-        except IqTimeout:
-            print('Tiempo de espera agotado')
+        if self.registering:
+            iq = self.Iq()
+            iq['type'] = 'set'
+            iq['register']['username'] = self.boundjid.user
+            iq['register']['password'] = self.password
+            iq['register']['name'] = self.Name
+            iq['register']['email'] = self.Email
+            try:
+                iq.send(now=True)
+            except IqError as e:
+                print(e.iq)
+            except IqTimeout:
+                print('Tiempo de espera agotado')
+
+    def create_group(self, room):
+        print(self.plugin['xep_0045'].getJoinedRooms())
+        self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait=True)
+        self.plugin['xep_0045'].setAffiliation(room, self.boundjid.full, affiliation='owner')
+        self.plugin['xep_0045'].configureRoom(room, ifrom=self.boundjid.full)
+
+    def join_group(self, room):
+        print(self.plugin['xep_0045'].getJoinedRooms())
+        self.plugin['xep_0045'].joinMUC(room, self.boundjid.user)
+        self.add_event_handler("muc::%s::got_online" % room,
+                               self.muc_online)
+
+    def send_message_to_group(self, room, message):
+        self.send_message(mto=room, mbody=message, mtype='groupchat')
+
+    def muc_online(self, presence):
+        print(presence['muc']['nick'], 'has joined the room')
+
+    def muc_invite(self, inv):
+        print('invitacion a grupo')
