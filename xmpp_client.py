@@ -10,9 +10,18 @@ SERVER = '@alumchat.fun'
 PORT = 5222
 
 class Client(ClientXMPP):
-    def __init__(self, jid, password):
+    def __init__(self, jid, password, Name=None, Email=None):
         ClientXMPP.__init__(self, jid, password)
+        self.password = password
+        self.Name = Name
+        self.Email = Email
         self.add_event_handler('session_start', self.on_session_start)
+        self.add_event_handler("register", self.on_register)
+        self.register_plugin('xep_0030')  # Service Discovery
+        self.register_plugin('xep_0004')  # Data forms
+        self.register_plugin('xep_0066')  # Out-of-band Data
+        self.register_plugin('xep_0077')  # In-band Registration
+        self['xep_0077'].force_registration = True
         self.contacts = []
 
     def on_session_start(self, event):
@@ -40,7 +49,8 @@ class Client(ClientXMPP):
         self.send_presence(pshow=show, pstatus=status)
 
     def add_contact(self, jid, subscription_meessage):
-        self.send_presence(pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
+        self.send_presence(
+            pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
 
     def get_contacts(self, jid='*'):
         iq = self.get_search_iq(jid)
@@ -56,7 +66,8 @@ class Client(ClientXMPP):
                             for value in list(field):
                                 values[field.attrib['var']] = value.text
                         if values != {}:
-                            users.append(Contact(jid=values['jid'], Email=values['Email'], Username=values['Username'], Name=values['Name']))
+                            users.append(Contact(
+                                jid=values['jid'], Email=values['Email'], Username=values['Username'], Name=values['Name']))
         except IqError as e:
             print(e.iq)
         except IqTimeout:
@@ -77,7 +88,8 @@ class Client(ClientXMPP):
                 if user.find(jid) != -1:
                     user_roster = self.client_roster[user]
                     contact.set_info('Name', user_roster['name'])
-                    contact.set_info('Subscription', user_roster['subscription'])
+                    contact.set_info(
+                        'Subscription', user_roster['subscription'])
                     contact.set_info('Groups', user_roster['groups'])
                     connected_roster = self.client_roster.presence(user)
                     if connected_roster.items():
@@ -132,3 +144,17 @@ class Client(ClientXMPP):
                 if contact.jid == new_contact.jid:
                     contact.update(new_contact)
                     break
+
+    def on_register(self, event):
+        iq = self.Iq()
+        iq['type'] = 'set'
+        iq['register']['username'] = self.boundjid.user
+        iq['register']['password'] = self.password
+        iq['register']['name'] = self.Name
+        iq['register']['email'] = self.Email
+        try:
+            iq.send(now=True)
+        except IqError as e:
+            print(e.iq)
+        except IqTimeout:
+            print('Tiempo de espera agotado')

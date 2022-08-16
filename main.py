@@ -27,7 +27,8 @@ while option != "3" and not is_authenticated:
     if option == "1":
         username = input("\nIngrese su nombre de usuario: ")
         password = input("Ingrese su contraseña: ")
-        password = "91vGs55@hHjJ"
+        if username == 'jurhs':
+            password = "91vGs55@hHjJ"
         client = Client(username + SERVER, password)
         print("\nIniciando sesion...")
         if client.login():
@@ -36,7 +37,16 @@ while option != "3" and not is_authenticated:
         else:
             print("\nError al iniciar sesion")
     elif option == "2":
-        pass
+        username = input("\nIngrese su nombre de usuario: ")
+        password = input("Ingrese su contraseña: ")
+        name = input("Ingrese su nombre: ")
+        email = input("Ingrese su correo: ")
+        client = Client(username + SERVER, password, name, email)
+        if client.login():
+            is_authenticated = True
+            print("\nCuenta creada")
+        else:
+            print("\nError al registrar")
     elif option == "3":
         print("Saliendo...")
     else:
