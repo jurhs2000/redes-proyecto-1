@@ -4,6 +4,7 @@ class Contact():
         self.Email = Email
         self.Username = Username
         self.Name = Name
+        self.messages = []
 
     def set_info(self, key, value):
         self.__setattr__(key, value)
@@ -14,6 +15,9 @@ class Contact():
             if contact.__getattribute__(key) != None:
                 self.__setattr__(key, contact.__getattribute__(key))
         return self
+
+    def add_message(self, message):
+        self.messages.append(message)
 
     def __str__(self) -> str:
         # print all the fields of the contact

@@ -64,12 +64,14 @@ menu = '''
 6. Unirse a grupo
 7. Enviar mensaje a grupo
 8. Enviar mensaje de presencia
-9. Salir
+9. Eliminar contacto
+10. Eliminar mi cuenta del servidor
+11. Salir
 '''
 
 option = ""
 
-while option != "9":
+while option != "11":
     print(menu)
     option = input("Seleccione una opcion: ")
     if option == "1":
@@ -87,7 +89,8 @@ while option != "9":
         message_option = input("Seleccione una opcion: ")
         if message_option == "1":
             user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el mensaje: ")
-            message = input("Ingrese el mensaje a enviar: ")
+            client.show_chat(user_to_send)
+            message = input("You: ")
             client.send_message_to_user(user_to_send, message)
         elif message_option == "2":
             user_to_send = input("Ingrese el nombre de usuario del usuario a enviar el archivo: ")
@@ -103,7 +106,8 @@ while option != "9":
         print("\nHas entrado al grupo")
     elif option == "7":
         group_to_send = input("Ingrese el nombre del grupo a enviar el mensaje: ")
-        message = input("Ingrese el mensaje a enviar: ")
+        client.show_room_chat(group_to_send)
+        message = input("You: ")
         client.send_message_to_group(group_to_send, message)
     elif option == "8":
         print("\n1. available\n2. away\n3. not available\n4. busy")
@@ -120,8 +124,31 @@ while option != "9":
             show = "dnd"
         client.set_status(show, message)
     elif option == "9":
+        user_to_delete = input("Ingrese el nombre de usuario del usuario a eliminar: ")
+        client.delete_contact(user_to_delete)
+        print("\nContacto eliminado")
+    elif option == "10":
+        client.delete_account()
+        print("\nCuenta eliminada")
+        option = "11"
+        exit()
+    elif option == "11":
         print("Saliendo...")
         client.disconnect()
         exit()
+    elif option == "Y" or option == "y":
+        if client.to_chat:
+            client.to_chat = False
+            if client.to_chat_type == "contact":
+                client.show_chat(client.message_receiver)
+                message = input("You: ")
+                client.send_message_to_user(client.message_receiver, message)
+            else:
+                client.show_room_chat(client.message_receiver)
+                message = input("You: ")
+                client.send_message_to_group(client.message_receiver, message)
     else:
-        print("Opcion no valida")
+        if option == "n" or option == "N" and client.to_chat:
+            client.to_chat = False
+        else:
+            print("Opcion no valida")

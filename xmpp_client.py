@@ -21,6 +21,7 @@ class Client(ClientXMPP):
         self.Name = Name
         self.Email = Email
         self.registering = registering
+        self.to_chat = False
         self.add_event_handler('session_start', self.on_session_start)
         self.add_event_handler("register", self.on_register)
         self.add_event_handler("presence_subscribe", self.on_presence_subscribe)
@@ -41,24 +42,60 @@ class Client(ClientXMPP):
         self.register_plugin('xep_0096') # File transfer
         self.register_plugin('xep_0231') # BOB
         self.contacts = []
+        self.rooms = {}
 
     def on_session_start(self, event):
         self.set_status('chat', 'available')
         self.update_roster()
 
     def on_message(self, msg):
+        show_response = True
         # on type groupchat
         if msg['type'] == 'groupchat':
-            room = msg['from'].bare.split('@')[0]
-            # get the message
-            message = msg['body']
             # get the nick
             nick = msg['mucnick']
-            print(f'\n[{room}] {nick}: {message}')
+            if nick == self.boundjid.user:
+                show_response = False
+            else:
+                # get the room
+                room = msg['from'].bare.split('@')[0]
+                # get the message
+                message = msg['body']
+                print(f'\n[{room}] {nick}: {message}')
+                # add the message to the room
+                self.rooms[room].append(f'[{room}] {nick}: {message}')
+                self.to_chat_type = 'room'
+                self.message_receiver = room
         else:
             # remove all after @
             user = msg['from'].bare.split('@')[0]
-            print(f'\n{user}: {msg["body"]}')
+            if user == self.boundjid.user:
+                show_response = False
+            else:
+                print(f'\n{user}: {msg["body"]}')
+                for contact in self.contacts:
+                    if contact.jid == user:
+                        contact.add_message(f'{user}: {msg["body"]}')
+                        self.to_chat_type = 'contact'
+                        self.message_receiver = user
+                        break
+        if show_response:
+            print("Desea responder a este mensaje? (Y/n)")
+            self.to_chat = True
+
+    def show_chat(self, jid):
+        for contact in self.contacts:
+            if contact.jid == jid:
+                for message in contact.messages:
+                    print(message)
+                break
+
+    def show_room_chat(self, room):
+        if room in self.rooms.keys():
+            for message in self.rooms[room]:
+                print(message)
+        else:
+            print('No estas en esta sala!')
 
     def on_got_offline(self, presence):        
         if self.boundjid.bare not in str(presence['from']):
@@ -89,6 +126,10 @@ class Client(ClientXMPP):
 
     def send_message_to_user(self, jid, message):
         self.send_message(mto=jid+SERVER, mbody=message, mtype='chat')
+        for contact in self.contacts:
+            if contact.jid == jid:
+                contact.add_message("{}: {}".format("You:", message))
+                break
 
     async def send_file_to_user(self, jid, file):
         '''m = self.Message()
@@ -149,8 +190,13 @@ class Client(ClientXMPP):
         self.send_presence(pshow=show, pstatus=status)
 
     def add_contact(self, jid, subscription_meessage):
-        self.send_presence(
-            pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
+        for contact in self.contacts:
+            if contact.jid == jid:
+                print('Este contacto ya existe')
+            else:
+                contact.add_message(subscription_meessage)
+                self.send_presence(
+                    pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
 
     def get_contacts(self, jid='*'):
         iq = self.get_search_iq(jid)
@@ -204,7 +250,7 @@ class Client(ClientXMPP):
 
     def search_user(self, jid):
         self.update_contacts(self.get_contact_by_jid(jid))
-        self.update_contacts(self.get_contacts(jid))
+        self.get_contacts(jid)
 
     def create_iq(self, **kwargs):
         iq = self.Iq()
@@ -244,6 +290,8 @@ class Client(ClientXMPP):
                 if contact.jid == new_contact.jid:
                     contact.update(new_contact)
                     break
+                else:
+                    self.contacts.append(new_contact)
 
     def on_register(self, event):
         if self.registering:
@@ -265,19 +313,48 @@ class Client(ClientXMPP):
         self.plugin['xep_0045'].joinMUC(room+ROOM_SERVER, self.boundjid.user, wait=True)
         self.plugin['xep_0045'].setAffiliation(room+ROOM_SERVER, self.boundjid.full, affiliation='owner')
         self.plugin['xep_0045'].configureRoom(room+ROOM_SERVER, ifrom=self.boundjid.full)
+        self.rooms[room] = []
 
     def join_group(self, room):
         print(self.plugin['xep_0045'].getJoinedRooms())
         self.plugin['xep_0045'].joinMUC(room+ROOM_SERVER, self.boundjid.user)
+        self.rooms[room] = []
         self.add_event_handler("muc::%s::got_online" % room+ROOM_SERVER,
                                self.muc_online)
 
     def send_message_to_group(self, room, message):
-        self.send_message(mto=room+ROOM_SERVER, mbody=message, mtype='groupchat')
+        if room in self.rooms.keys():
+            self.send_message(mto=room+ROOM_SERVER, mbody=message, mtype='groupchat')
+            self.rooms[room].append(f'[{room}] {self.boundjid.user}: {message}')
 
     def muc_online(self, presence):
         if presence['muc']['nick'] != self.boundjid.user:
             print(f'{presence["muc"]["nick"]} se ha conectado a la sala')
+            self.rooms[presence['muc']['room']].append(f'{presence["muc"]["nick"]} se ha conectado a la sala')
 
     def muc_invite(self, inv):
         print('invitacion a grupo')
+
+    def delete_contact(self, jid):
+        self.del_roster_item(jid+SERVER)
+        for contact in self.contacts:
+            if contact.jid == jid:
+                self.contacts.remove(contact)
+                break
+
+    def delete_account(self):
+        iq = self.Iq()
+        iq['type'] = 'set'
+        iq['from'] = self.boundjid.bare
+        iq['register']['remove'] = True
+        try:
+            result = iq.send()
+            if result['type'] == 'result':
+                print('Cuenta eliminada')
+                self.disconnect()
+        except IqError as e:
+            print(e.iq)
+            self.disconnect()
+        except IqTimeout:
+            print('Tiempo de espera agotado')
+            self.disconnect()
