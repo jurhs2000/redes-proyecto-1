@@ -1,3 +1,4 @@
+# Contact of a client
 class Contact():
     def __init__(self, jid, Email=None, Username=None, Name=None):
         self.jid = jid
