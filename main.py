@@ -55,9 +55,6 @@ while login_option != "3":
     if login_option == "1":
         username = input("\nIngrese su nombre de usuario: ")
         password = input("Ingrese su contraseña: ")
-        # TODO: Remove this hardcoded password for username
-        if username == 'jurhs':
-            password = "91vGs55@hHjJ"
         client = Client(username + SERVER, password)
         print("\nIniciando sesion...")
         if client.login():
@@ -88,6 +85,8 @@ while login_option != "3":
         while option != "11":
             print(menu)
             option = input("Seleccione una opcion: ")
+            if not client.connected:
+                option = "11"
             # Show connected users
             if option == "1":
                 client.get_contacts()

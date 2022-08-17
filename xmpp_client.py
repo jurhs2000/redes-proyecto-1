@@ -24,6 +24,7 @@ class Client(ClientXMPP):
         self.to_chat = False # Indicates if the client is waiting for a response to a message
         self.contacts = []
         self.rooms = {}
+        self.connected = False
         self.add_event_handler('session_start', self.on_session_start)
         self.add_event_handler("register", self.on_register)
         self.add_event_handler("presence_subscribe", self.on_presence_subscribe)
@@ -33,6 +34,8 @@ class Client(ClientXMPP):
         self.add_event_handler("message", self.on_message)
         self.add_event_handler("changed_status", self.on_changed_status)
         self.add_event_handler("groupchat_invite", self.muc_invite)
+        self.add_event_handler("connection_failed", self.on_connection_failed)
+        self.add_event_handler("failed_auth", self.on_connection_failed)
         self.register_plugin('xep_0030') # Service Discovery
         self.register_plugin('xep_0004') # Data forms
         self.register_plugin('xep_0065') # SOCKS5 Bytestreams
@@ -46,7 +49,8 @@ class Client(ClientXMPP):
 
     def on_session_start(self, event):
         self.set_status('chat', 'available')
-        self.update_roster()
+        self.update_roster(firts_time=True)
+        self.connected = True
 
     def on_message(self, msg):
         show_response = True
@@ -80,7 +84,7 @@ class Client(ClientXMPP):
                 print(f'\n{user}: {msg["body"]}')
                 # add the message to the chat history
                 for contact in self.contacts:
-                    if contact.jid == user:
+                    if contact.jid == user+SERVER:
                         contact.add_message(f'{user}: {msg["body"]}')
                         self.to_chat_type = 'contact'
                         self.message_receiver = user
@@ -109,7 +113,7 @@ class Client(ClientXMPP):
     def on_got_offline(self, presence):        
         if self.boundjid.bare not in str(presence['from']):
             u = self.jid_to_user(str(presence['from']))
-            print(f'{u} se desconectó')
+            print(f'\n{u} se desconectó')
             for i in self.contacts:
                 if i.jid == str(presence['from']):
                     self.contacts.remove(i)
@@ -119,22 +123,30 @@ class Client(ClientXMPP):
     def on_got_online(self, presence):
         if self.boundjid.bare not in str(presence['from']):
             u = self.jid_to_user(str(presence['from']))
-            print(f'{u} se conectó')
+            print(f'\n{u} se conectó')
             for i in self.contacts:
                 if i.jid == str(presence['from']):
                     i.online = True
                     break
 
     # Get the roster (contacts list) and updates the contacts list
-    def update_roster(self):
-        roster = self.get_roster()
-        contacts_roster = []
-        for jid in roster['roster']['items'].keys():
-            contact = Contact(jid)
-            for k, v in roster['roster']['items'][jid].items():
-                contact.set_info(k, v)
-            contacts_roster.append(contact)
-        self.update_contacts(contacts_roster)
+    def update_roster(self, firts_time=False):
+        try:
+            roster = self.get_roster()
+            contacts_roster = []
+            for jid in roster['roster']['items'].keys():
+                contact = Contact(jid)
+                for k, v in roster['roster']['items'][jid].items():
+                    contact.set_info(k, v)
+                contacts_roster.append(contact)
+            if firts_time:
+                self.contacts = contacts_roster
+            else:
+                self.update_contacts(contacts_roster)
+        except IqError as e:
+            print(e.iq)
+        except IqTimeout:
+            print('Tiempo de espera agotado')
 
     # Send message and updates the chat history of the contact
     def send_message_to_user(self, jid, message):
@@ -184,25 +196,34 @@ class Client(ClientXMPP):
     # Show notification when someone added you as a contact
     def on_presence_subscribe(self, presence):
         username = presence['from'].bare
-        print(f'{username} quiere agregarte a tu lista de contactos')
+        print(f'\n{username} quiere agregarte a tu lista de contactos')
 
     # Show notification when someone removed you from the contact list
     def on_presence_unsubscribe(self, presence):
         username = presence['from'].bare
-        print(f'{username} te ha eliminado de su lista de contactos')
+        print(f'\n{username} te ha eliminado de su lista de contactos')
 
     # Show notification when someone change his status
     def on_changed_status(self, presence):
         username = presence['from'].bare
         print(self.client_roster.presence[username]['status'])
-        print(f'{username} ha cambiado su estado a {self.client_roster.presence[username]["status"]}')
+        print(f'\n{username} ha cambiado su estado a {self.client_roster.presence[username]["status"]}')
 
     # Connect to the server, used on login and register
     def login(self):
-        if self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False):
+        result = self.connect((SERVER[1:], PORT), use_ssl=False, use_tls=False)
+        print(result)
+        if result:
             self.process()
             return True
         return False
+
+    # Show error when connection failed
+    def on_connection_failed(self, error):
+        print('\nError de conexión: %s' % error)
+        print('Presiona enter para ingresar de nuevo')
+        self.connected = False
+        self.disconnect()
 
     # Set a new presence status and message
     def set_status(self, show, status):
@@ -210,13 +231,15 @@ class Client(ClientXMPP):
 
     # Add a new contact to the contact list if it doesn't exist
     def add_contact(self, jid, subscription_meessage):
+        can_add_contact = True
         for contact in self.contacts:
             if contact.jid == jid:
                 print('Este contacto ya existe')
-            else:
-                contact.add_message(subscription_meessage)
-                self.send_presence(
-                    pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
+                can_add_contact = False
+                continue
+        if can_add_contact:
+            self.send_presence(
+                pto=jid + SERVER, pstatus=subscription_meessage, ptype="subscribe")
 
     # show all the users in the server or show users that match the jid
     def get_contacts(self, jid='*'):
@@ -364,7 +387,7 @@ class Client(ClientXMPP):
 
     # Show notification when someone invites you to a room
     def muc_invite(self, inv):
-        print('invitacion a grupo')
+        print('\ninvitacion a grupo')
 
     # Remove a contact from your contact list
     def delete_contact(self, jid):
